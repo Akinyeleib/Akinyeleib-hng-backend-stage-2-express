@@ -3,6 +3,7 @@ const { v4: uuidv4 } = require('uuid');
 const jwt = require("jsonwebtoken");
 require('dotenv').config()
 const router = Router()
+const { hash, compare } = require('bcrypt')
 
 const { PrismaClient } = require('@prisma/client')
 const prisma = new PrismaClient()
@@ -36,13 +37,15 @@ router.post('/register', async (req, res) => {
         })
     }
 
+    const hashedPassword = await hash(password, 10)
+
     const user = await prisma.user.create({
         data: {
             email,
             firstName,
             lastName,
             phone,
-            password,
+            "password": hashedPassword,
             organisations: {
                 create: {
                     name: `${firstName}'s Organisation`
@@ -53,14 +56,17 @@ router.post('/register', async (req, res) => {
 
     let token = generateToken(user, res)
 
-    console.log(user)
-    console.log(user.organisations)
-    const data = { "accessToken": token, ...user }
-
     return res.status(201).json({
         "status": "success",
         "message": "Registration successful",
-        data
+        "data": {
+            "accessToken": token,
+            userId: user.userId,
+            email,
+            firstName,
+            lastName,
+            phone
+        }
     })
 
 })
