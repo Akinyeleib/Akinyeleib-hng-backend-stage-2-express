@@ -14,15 +14,23 @@ router.post('/register', async (req, res) => {
 
     if (!firstName) { 
         addErrorToList(errors, "firstName", "firstName can not be blank")
+    } else if (typeof firstName !== "string") {
+        addErrorToList(errors, "firstName", "firstName must be string")
     }
     if (!lastName) { 
         addErrorToList(errors, "lastName", "lastName can not be blank")
+    } else if (typeof lastName !== "string") {
+        addErrorToList(errors, "lastName", "lastName must be string")
     }
     if (!email) { 
         addErrorToList(errors, "email", "email can not be blank")
+    } else if (typeof email !== "string") {
+        addErrorToList(errors, "email", "email must be string")
     }
     if (!password) { 
         addErrorToList(errors, "password", "password can not be blank")
+    } else if (typeof password !== "string") {
+        addErrorToList(errors, "password", "password must be string")
     }
 
     const emailUsed = await prisma.user.findUnique({where:{email}})
@@ -77,10 +85,15 @@ router.post('/login', async (req, res) => {
 
     if (!email) { 
         addErrorToList(errors, "email", "email can not be blank")
+    } else if (typeof email !== "string") {
+        addErrorToList(errors, "email", "email must be string")
     }
     if (!password) { 
         addErrorToList(errors, "password", "password can not be blank")
+    } else if (typeof password !== "string") {
+        addErrorToList(errors, "password", "password must be string")
     }
+    
     if (errors.length > 0) {
         return res.status(422).json({
             "errors": errors
