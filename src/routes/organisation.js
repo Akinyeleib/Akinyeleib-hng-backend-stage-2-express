@@ -8,7 +8,7 @@ const prisma = new PrismaClient()
 
 router.get('/', checkToken,async (req, res) => {
     const { userId } = req.verifiedUser
-    console.log(userId)
+
     const organisations = await prisma.organisation.findMany({
         where:{
             users: 
@@ -28,29 +28,18 @@ router.get('/', checkToken,async (req, res) => {
 })
 
 router.get('/:orgId', checkToken,async (req, res) => {
-    const { id } = req.params
+    const { orgId } = req.params
     const { userId } = req.verifiedUser
-
-    if (userId !== id) {
-        return res.status(403).json({
-            "status": "Bad request",
-            "message": "Unauthorised",
-            "statusCode": 403
-        })
-    }
     
-    const user = await prisma.user.findUnique({
-        where:{userId},
-        select: {
-            userId: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-            phone: true,
+    const organisation = await prisma.organisation.findUnique({
+        where:{
+            orgId,
+            users: { some: {userId} }
         },
+        
     })
 
-    const data = { ...user }
+    const data = { ...organisation }
 
     return res.status(200).json({
         "status": "success",
