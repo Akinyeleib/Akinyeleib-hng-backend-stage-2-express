@@ -1,5 +1,4 @@
 const { Router } = require('express')
-const { v4: uuidv4 } = require('uuid');
 const jwt = require("jsonwebtoken");
 require('dotenv').config()
 const router = Router()
@@ -90,29 +89,42 @@ router.post('/login', async (req, res) => {
 
     const user = await prisma.user.findUnique({where:{email}})
     if (!user) {
-        return res.status(401).json({ "message": "Invalid Credentials" })
+        return res.status(401).json({
+            "status": "Bad request",
+            "message": "Authentication failed",
+            "statusCode": 401
+        })
     }
 
-    const orgs = []
-    
-    
-    let token = generateToken(user, res)
+    const isValid = await compare(password, user.password)
 
-    return res
-        .status(200)
-        .json({
-            "status": "success",
-            "message": "Login successful",
-            data: {
-                accessToken: token,
-                user,
-                orgs: email,
-            },
-        });
+    if (!isValid) {
+        return res.status(401).json({
+            "status": "Bad request",
+            "message": "Authentication failed",
+            "statusCode": 401
+        })
+    }
+
+    let token = generateToken(user, res)
+    const { userId, firstName, lastName, phone } = user
+
+    return res.status(200).json({
+        "status": "success",
+        "message": "Login successful",
+        "data": {
+            "accessToken": token,
+            user: {
+                userId,
+                email,
+                firstName,
+                lastName,
+                phone
+            }
+        }
+    })
 
 })
-
-function generateUUID() { return uuidv4() }
 
 function addErrorToList(list, field, message) {
     list.push({ "field": field, "message": message })
