@@ -31,12 +31,7 @@ function checkToken(req, res, next) {
 
     try {
         const decodedToken = jwt.verify(token, process.env.JWT_SECRET);
-        
-        req['verifiedUser'] = {
-            userId: decodedToken.userId,
-            email: decodedToken.email,
-            token
-        }
+        req['verifiedUser'] = { ...decodedToken, token }
         next()
     } catch {
         return res.status(401).json({

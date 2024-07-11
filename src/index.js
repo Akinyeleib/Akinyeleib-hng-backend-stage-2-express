@@ -12,7 +12,7 @@ app.use(express.json())
 
 app.use('/auth', authRouter)
 app.use('/api/users', userRouter)
-app.use('/organisation', organisationRouter)
+app.use('/api/organisations', organisationRouter)
 
 app.get('/', (req, res) => {
     res.send('Hello....nndh.')
