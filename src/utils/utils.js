@@ -1,32 +1,49 @@
-const { v4: uuidv4 } = require('uuid');
-
-function generateUUID() { return uuidv4() }
-
-function addErrorToList(list, field, message) {
-    list.push({ "field": field, "message": message })
-} 
+const jwt = require("jsonwebtoken");
+require('dotenv').config()
 
 function checkToken(req, res, next) {
-    const token = req.headers.authorization.split(' ')[1];
-    //Authorization: 'Bearer TOKEN'
-    if (!token) {
-        res
-            .status(401)
-            .json(
-                {
-                    success: false,
-                    message: "Error!Token was not provided."
-                }
-            );
+    
+    const auth = req.headers.authorization;
+    if (!auth) {
+        return res.status(401).json({
+            "status": "Bad request",
+            "message": "Missing Token",
+            "statusCode": 401
+        })
     }
-    //Decoding the token
-    const decodedToken =
-        jwt.verify(token, "secretkeyappearshere");
+    
+    if (!auth.startsWith('Bearer ')) {
+        return res.status(401).json({
+            "status": "Bad request",
+            "message": "Invalid Token",
+            "statusCode": 401
+        })
+    }
+    
+    const token = auth.split(' ')[1]
+    if (!token) {
+        return res.status(401).json({
+            "status": "Bad request",
+            "message": "Invalid Token",
+            "statusCode": 401
+        })
+    }
+
+    try {
+        const decodedToken = jwt.verify(token, process.env.JWT_SECRET);
+        
         req['verifiedUser'] = {
             userId: decodedToken.userId,
             email: decodedToken.email
         }
-    next()
+        next()
+    } catch {
+        return res.status(401).json({
+            "status": "Bad request",
+            "message": "Invalid or expired Token",
+            "statusCode": 401
+        })
+    }
 }
 
 module.exports = checkToken

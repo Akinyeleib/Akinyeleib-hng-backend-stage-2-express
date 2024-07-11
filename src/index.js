@@ -11,7 +11,7 @@ const PORT = process.env.PORT || 81
 app.use(express.json())
 
 app.use('/auth', authRouter)
-app.use('/user', userRouter)
+app.use('/api/users', userRouter)
 app.use('/organisation', organisationRouter)
 
 app.get('/', (req, res) => {
