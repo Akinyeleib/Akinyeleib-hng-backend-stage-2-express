@@ -4,8 +4,10 @@ const jwt = require("jsonwebtoken");
 require('dotenv').config()
 const router = Router()
 
+const { PrismaClient } = require('@prisma/client')
+const prisma = new PrismaClient()
 
-router.post('/register', (req, res) => {
+router.post('/register', async (req, res) => {
     const body = req.body
     const { firstName, lastName, email, phone, password } = body
     const errors = []
@@ -22,31 +24,48 @@ router.post('/register', (req, res) => {
     if (!password) { 
         addErrorToList(errors, "password", "password can not be blank")
     }
+
+    const emailUsed = await prisma.user.findUnique({where:{email}})
+    if (emailUsed) {
+        addErrorToList(errors, "email", "Email in use")
+    }
+
     if (errors.length > 0) {
         return res.status(422).json({
             "errors": errors
         })
     }
 
-    const userId = "id"
-    let token = generateToken({ userId, email }, res)
+    const user = await prisma.user.create({
+        data: {
+            email,
+            firstName,
+            lastName,
+            phone,
+            password,
+            organisations: {
+                create: {
+                    name: `${firstName}'s Organisation`
+                }
+            }
+        }
+    })
+
+    let token = generateToken(user, res)
+
+    console.log(user)
+    console.log(user.organisations)
+    const data = { "accessToken": token, ...user }
 
     return res.status(201).json({
         "status": "success",
         "message": "Registration successful",
-        "data": {
-            "accessToken": token,
-            "userId": generateUUID(),
-            "firstName": firstName,
-            "lastName": lastName,
-            "email": email,
-            "phone": phone
-        }
+        data
     })
 
 })
 
-router.post('/login', (req, res) => {
+router.post('/login', async (req, res) => {
     const body = req.body
     const { email, password } = body
     const errors = []
@@ -63,9 +82,15 @@ router.post('/login', (req, res) => {
         })
     }
 
-    const userId = "id"
+    const user = await prisma.user.findUnique({where:{email}})
+    if (!user) {
+        return res.status(401).json({ "message": "Invalid Credentials" })
+    }
+
+    const orgs = []
     
-    let token = generateToken({ userId, email }, res)
+    
+    let token = generateToken(user, res)
 
     return res
         .status(200)
@@ -74,7 +99,7 @@ router.post('/login', (req, res) => {
             "message": "Login successful",
             data: {
                 accessToken: token,
-                user: userId,
+                user,
                 orgs: email,
             },
         });
