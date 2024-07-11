@@ -10,19 +10,31 @@ router.get('/:id', checkToken,async (req, res) => {
     const { id } = req.params
     const { userId } = req.verifiedUser
 
+    if (userId !== id) {
+        return res.status(403).json({
+            "status": "Bad request",
+            "message": "Unauthorised",
+            "statusCode": 403
+        })
+    }
+    
+    const user = await prisma.user.findUnique({
+        where:{userId},
+        select: {
+            userId: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            phone: true,
+        },
+    })
+
+    const data = { ...user }
+
     return res.status(200).json({
         "status": "success",
         "message": "Registration successful",
-        id,
-        userId
-        // "data": {
-        //     "accessToken": token,
-        //     userId: user.userId,
-        //     email,
-        //     firstName,
-        //     lastName,
-        //     phone
-        // }
+        data
     })
 
 })

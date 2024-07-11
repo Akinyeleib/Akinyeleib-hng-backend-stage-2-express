@@ -34,7 +34,8 @@ function checkToken(req, res, next) {
         
         req['verifiedUser'] = {
             userId: decodedToken.userId,
-            email: decodedToken.email
+            email: decodedToken.email,
+            token
         }
         next()
     } catch {
