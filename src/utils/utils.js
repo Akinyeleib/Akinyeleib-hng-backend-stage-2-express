@@ -1,7 +1,9 @@
 const jwt = require("jsonwebtoken");
 require('dotenv').config()
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient()
 
-function checkToken(req, res, next) {
+async function checkToken(req, res, next) {
     
     const auth = req.headers.authorization;
     if (!auth) {
@@ -31,6 +33,15 @@ function checkToken(req, res, next) {
 
     try {
         const decodedToken = jwt.verify(token, process.env.JWT_SECRET);
+
+        const user = await prisma.user.findUnique({ where: { email: decodedToken.email } })
+        if (!user) {
+            return res.status(404).json({
+                "status": "Bad request",
+                "message": "User record not found!",
+                "statusCode": 404
+            })
+        }
         req['verifiedUser'] = { ...decodedToken, token }
         next()
     } catch {
