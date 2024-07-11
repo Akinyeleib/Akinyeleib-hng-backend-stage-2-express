@@ -15,7 +15,6 @@ router.get('/', checkToken,async (req, res) => {
             { some: {userId} }
         }
     })
-    console.log(organisations)
 
     return res.status(200).json({
         "status": "success",
@@ -39,15 +38,46 @@ router.get('/:orgId', checkToken,async (req, res) => {
         
     })
 
+    if (!organisation) {
+        return res.status(404).json({
+            "status": "Failed",
+            "message": "User doesn't belong to any organisation with the specified id",
+            "statusCode": 404
+        })
+    }
+
     const data = { ...organisation }
 
     return res.status(200).json({
         "status": "success",
-        "message": "Registration successful",
+        "message": "successful",
         data
     })
 
 })
 
+router.post('/', checkToken, async (req, res) => {
+    const { name, description } = req.body
+    const { userId } = req.verifiedUser
+
+    const organisations = await prisma.organisation.create({
+        data: {
+            name,
+            description,
+            users: {
+                connect: { userId }
+            }            
+        }
+    })
+
+    return res.status(200).json({
+        "status": "success",
+        "message": "organisations retrieval successful",
+        "data": {
+            "organisations": organisations
+        }
+    })
+
+})
 
 module.exports = router
