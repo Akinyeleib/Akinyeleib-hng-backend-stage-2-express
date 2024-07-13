@@ -13,22 +13,22 @@ router.post('/register', async (req, res) => {
     const errors = []
 
     if (!firstName) { 
-        addErrorToList(errors, "firstName", "firstName is a required fiels")
+        addErrorToList(errors, "firstName", "firstName is a required field")
     } else if (typeof firstName !== "string") {
         addErrorToList(errors, "firstName", "firstName must be string")
     }
     if (!lastName) { 
-        addErrorToList(errors, "lastName", "lastName is a required fiels")
+        addErrorToList(errors, "lastName", "lastName is a required field")
     } else if (typeof lastName !== "string") {
         addErrorToList(errors, "lastName", "lastName must be string")
     }
     if (!email) { 
-        addErrorToList(errors, "email", "email is a required fiels")
+        addErrorToList(errors, "email", "email is a required field")
     } else if (typeof email !== "string") {
         addErrorToList(errors, "email", "email must be string")
     }
     if (!password) { 
-        addErrorToList(errors, "password", "password is a required fiels")
+        addErrorToList(errors, "password", "password is a required field")
     } else if (typeof password !== "string") {
         addErrorToList(errors, "password", "password must be string")
     }
@@ -84,12 +84,12 @@ router.post('/login', async (req, res) => {
     const errors = []
 
     if (!email) { 
-        addErrorToList(errors, "email", "email is a required fiels")
+        addErrorToList(errors, "email", "email is a required field")
     } else if (typeof email !== "string") {
         addErrorToList(errors, "email", "email must be string")
     }
     if (!password) { 
-        addErrorToList(errors, "password", "password is a required fiels")
+        addErrorToList(errors, "password", "password is a required field")
     } else if (typeof password !== "string") {
         addErrorToList(errors, "password", "password must be string")
     }

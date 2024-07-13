@@ -61,7 +61,7 @@ router.post('/', checkToken, async (req, res) => {
     const errors = []
     
     if (!name) { 
-        addErrorToList(errors, "name", "name is a required fiels")
+        addErrorToList(errors, "name", "name is a required field")
     } else if (typeof name !== "string") {
         addErrorToList(errors, "name", "name must be string")
     }
@@ -100,7 +100,7 @@ router.post('/:orgId/users', async (req, res) => {
     const errors = []
     
     if (!userId) { 
-        addErrorToList(errors, "userId", "userId is a required fiels")
+        addErrorToList(errors, "userId", "userId is a required field")
     } else if (typeof userId !== "string") {
         addErrorToList(errors, "userId", "userId must be string")
     }
