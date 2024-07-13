@@ -1,0 +1,441 @@
+const jwt = require("jsonwebtoken");
+const express = require('express')
+require('dotenv').config()
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient()
+const app = express()
+const { hash, compare } = require('bcrypt')
+
+const PORT = process.env.PORT || 81
+
+app.use(express.json())
+
+app.get('/', (req, res) => {
+    res.send('Hello....nndh.')
+})
+
+app.get('/api/organisations/', checkToken,async (req, res) => {
+    const { userId } = req.verifiedUser
+
+    const organisations = await prisma.organisation.findMany({
+        where:{
+            users: 
+            { some: {userId} }
+        }
+    })
+
+    return res.status(200).json({
+        "status": "success",
+        "message": "organisations retrieval successful",
+        "data": {
+            "organisations": organisations
+        }
+    })
+
+})
+
+app.get('/api/organisations/:orgId', checkToken,async (req, res) => {
+    const { orgId } = req.params
+    const { userId } = req.verifiedUser
+    
+    const organisation = await prisma.organisation.findUnique({
+        where:{
+            orgId,
+            users: { some: {userId} }
+        },
+        
+    })
+
+    if (!organisation) {
+        return res.status(404).json({
+            "status": "Failed",
+            "message": "User doesn't belong to any organisation with the specified id",
+            "statusCode": 404
+        })
+    }
+
+    const data = { ...organisation }
+
+    return res.status(200).json({
+        "status": "success",
+        "message": "successful",
+        data
+    })
+
+})
+
+app.post('/api/organisations/', checkToken, async (req, res) => {
+    const { name, description } = req.body
+    const errors = []
+    
+    if (!name) { 
+        addErrorToList(errors, "name", "name is a required field")
+    } else if (typeof name !== "string") {
+        addErrorToList(errors, "name", "name must be string")
+    }
+
+    if (description && typeof description !== "string") {
+        addErrorToList(errors, "description", "description must be string")
+    }
+    
+    if (errors.length > 0) {
+        return res.status(422).json({
+            "errors": errors
+        })
+    }
+
+    const organisation = await prisma.organisation.create({
+        data: {
+            name,
+            description
+        }  
+    })
+
+    const data = { ...organisation }
+
+    return res.status(200).json({
+        "status": "success",
+        "message": "Organisation created successfully",
+        data
+    })
+
+})
+
+app.post('/api/organisations/:orgId/users', async (req, res) => {
+    const { orgId } = req.params
+    const { userId } = req.body
+    
+    const errors = []
+    
+    if (!userId) { 
+        addErrorToList(errors, "userId", "userId is a required field")
+    } else if (typeof userId !== "string") {
+        addErrorToList(errors, "userId", "userId must be string")
+    }
+    
+    if (errors.length > 0) {
+        return res.status(422).json({
+            "errors": errors
+        })
+    }
+
+    let organisation = await prisma.organisation.findUnique({ where:{ orgId } })
+
+    if (!organisation) {
+        return res.status(404).json({
+            "status": "Failed",
+            "message": "Organisation with the specified id doesn't exist",
+            "statusCode": 404
+        })
+    }
+    
+    const user = await prisma.user.findUnique({where:{userId}})
+    if (!user) {
+        return res.status(404).json({
+            "status": "Failed",
+            "message": "User with the specified id doesn't exist",
+            "statusCode": 404
+        })
+    }
+
+    organisation = await prisma.organisation.findUnique({
+        where:{
+            orgId,
+            users: { some: {userId} }
+        }
+    })
+
+    if (organisation) {
+        return res.status(409).json({
+            "status": "failed",
+            "message": "User already added to organisation"
+        })
+    }
+
+    await prisma.organisation.update({
+        where: { orgId },
+        data: {
+            users: {
+                connect: { userId }
+            }
+        }
+    })
+
+    return res.status(200).json({
+        "status": "success",
+        "message": "User added to organisation successfully"
+    })
+
+})
+
+app.get('/api/users/:id', checkToken,async (req, res) => {
+    const { id } = req.params
+    const { userId } = req.verifiedUser
+
+    if (userId !== id) {
+        return res.status(403).json({
+            "status": "Bad request",
+            "message": "Unauthorised",
+            "statusCode": 403
+        })
+    }
+    
+    const user = await prisma.user.findUnique({
+        where:{userId},
+        select: {
+            userId: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            phone: true,
+        },
+    })
+
+    const data = { ...user }
+
+    return res.status(200).json({
+        "status": "success",
+        "message": "Registration successful",
+        data
+    })
+
+})
+
+app.post('/auth/register', async (req, res) => {
+    const body = req.body
+    const { firstName, lastName, email, phone, password } = body
+    const errors = []
+
+    if (!firstName) { 
+        addErrorToList(errors, "firstName", "firstName is a required field")
+    } else if (typeof firstName !== "string") {
+        addErrorToList(errors, "firstName", "firstName must be string")
+    }
+    if (!lastName) { 
+        addErrorToList(errors, "lastName", "lastName is a required field")
+    } else if (typeof lastName !== "string") {
+        addErrorToList(errors, "lastName", "lastName must be string")
+    }
+    if (!email) { 
+        addErrorToList(errors, "email", "email is a required field")
+    } else if (typeof email !== "string") {
+        addErrorToList(errors, "email", "email must be string")
+    }
+    if (!password) { 
+        addErrorToList(errors, "password", "password is a required field")
+    } else if (typeof password !== "string") {
+        addErrorToList(errors, "password", "password must be string")
+    }
+
+    const emailUsed = await prisma.user.findUnique({where:{email}})
+    if (emailUsed) {
+        addErrorToList(errors, "email", "Email in use")
+    }
+
+    if (errors.length > 0) {
+        return res.status(422).json({
+            "errors": errors
+        })
+    }
+
+    const hashedPassword = await hash(password, 10)
+
+    const user = await prisma.user.create({
+        data: {
+            email,
+            firstName,
+            lastName,
+            phone,
+            "password": hashedPassword,
+            organisations: {
+                create: {
+                    name: `${firstName}'s Organisation`
+                }
+            }
+        }
+    })
+
+    let token = generateToken(user, res)
+
+    return res.status(201).json({
+        "status": "success",
+        "message": "Registration successful",
+        "data": {
+            "accessToken": token,
+            userId: user.userId,
+            email,
+            firstName,
+            lastName,
+            phone
+        }
+    })
+
+})
+
+app.post('/auth/login', async (req, res) => {
+    const body = req.body
+    const { email, password } = body
+    const errors = []
+
+    if (!email) { 
+        addErrorToList(errors, "email", "email is a required field")
+    } else if (typeof email !== "string") {
+        addErrorToList(errors, "email", "email must be string")
+    }
+    if (!password) { 
+        addErrorToList(errors, "password", "password is a required field")
+    } else if (typeof password !== "string") {
+        addErrorToList(errors, "password", "password must be string")
+    }
+    
+    if (errors.length > 0) {
+        return res.status(422).json({
+            "errors": errors
+        })
+    }
+
+    const user = await prisma.user.findUnique({where:{email}})
+    if (!user) {
+        return res.status(401).json({
+            "status": "Bad request",
+            "message": "Authentication failed",
+            "statusCode": 401
+        })
+    }
+
+    const isValid = await compare(password, user.password)
+
+    if (!isValid) {
+        return res.status(401).json({
+            "status": "Bad request",
+            "message": "Authentication failed",
+            "statusCode": 401
+        })
+    }
+
+    let token = generateToken(user, res)
+    const { userId, firstName, lastName, phone } = user
+
+    return res.status(200).json({
+        "status": "success",
+        "message": "Login successful",
+        "data": {
+            "accessToken": token,
+            user: {
+                userId,
+                email,
+                firstName,
+                lastName,
+                phone
+            }
+        }
+    })
+
+})
+
+app.listen(PORT, () => {
+    console.log("Running express server on port: " + PORT)
+})
+
+
+function addErrorToList(list, field, message) {
+    list.push({ "field": field, "message": message })
+} 
+
+function generateToken(user, res) {
+    const { userId, email } = user
+    let token;
+    try {
+        token = jwt.sign(
+            {
+                userId,
+                email
+            },
+            process.env.JWT_SECRET,
+            { expiresIn: "1h" }
+        );
+        return token
+    } catch (err) {
+        console.log(err);
+        return res
+        .status(500)
+        .json({
+            "status": "failed",
+            "message": "Unable to generate token"
+        })
+    }
+}
+
+async function checkToken(req, res, next) {
+    
+    const auth = req.headers.authorization;
+    if (!auth) {
+        return res.status(401).json({
+            "status": "Bad request",
+            "message": "Missing Token",
+            "statusCode": 401
+        })
+    }
+    
+    if (!auth.startsWith('Bearer ')) {
+        return res.status(401).json({
+            "status": "Bad request",
+            "message": "Invalid Token",
+            "statusCode": 401
+        })
+    }
+    
+    const token = auth.split(' ')[1]
+    if (!token) {
+        return res.status(401).json({
+            "status": "Bad request",
+            "message": "Invalid Token",
+            "statusCode": 401
+        })
+    }
+
+    try {
+        const decodedToken = jwt.verify(token, process.env.JWT_SECRET);
+
+        const user = await prisma.user.findUnique({ where: { email: decodedToken.email } })
+        if (!user) {
+            return res.status(404).json({
+                "status": "Bad request",
+                "message": "User record not found!",
+                "statusCode": 404
+            })
+        }
+        req['verifiedUser'] = { ...decodedToken, token }
+        next()
+    } catch {
+        return res.status(401).json({
+            "status": "Bad request",
+            "message": "Invalid or expired Token",
+            "statusCode": 401
+        })
+    }
+}
+
+
+==========================
+Unit Testing
+
+Write appropriate unit tests to cover
+ Token generation - Ensure token expires at the correct time and correct user details is found in token.
+ Organisation - Ensure users can’t see data from organisations they don’t have access to.
+End-to-End Test Requirements for the Register Endpoint
+The goal is to ensure the POST /auth/register endpoint works correctly by performing end-to-end tests. The tests should cover successful user registration, validation errors, and database constraints.
+Directory Structure:
+ The test file should be named auth.spec.ext (ext is the file extension of your chosen language) inside a folder named tests . For example tests/auth.spec.ts assuming I’m using Typescript
+Test Scenarios:
+ It Should Register User Successfully with Default Organisation:Ensure a user is registered successfully when no organisation details are provided.
+ Verify the default organisation name is correctly generated (e.g., "John's Organisation" for a user with the first name "John").
+ Check that the response contains the expected user details and access token.
+ It Should Log the user in successfully:Ensure a user is logged in successfully when a valid credential is provided and fails otherwise.
+ Check that the response contains the expected user details and access token.
+ It Should Fail If Required Fields Are Missing:Test cases for each required field (firstName, lastName, email, password) missing.
+ Verify the response contains a status code of 422 and appropriate error messages.
+ It Should Fail if there’s Duplicate Email or UserID:Attempt to register two users with the same email.
+ Verify the response contains a status code of 422 and appropriate error messages.
+
+Write the test cases only using jest supertest libraries
