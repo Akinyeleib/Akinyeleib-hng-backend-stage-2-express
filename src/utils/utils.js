@@ -1,32 +1,56 @@
-const { v4: uuidv4 } = require('uuid');
+const jwt = require("jsonwebtoken");
+require('dotenv').config()
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient()
 
-function generateUUID() { return uuidv4() }
-
-function addErrorToList(list, field, message) {
-    list.push({ "field": field, "message": message })
-} 
-
-function checkToken(req, res, next) {
-    const token = req.headers.authorization.split(' ')[1];
-    //Authorization: 'Bearer TOKEN'
-    if (!token) {
-        res
-            .status(401)
-            .json(
-                {
-                    success: false,
-                    message: "Error!Token was not provided."
-                }
-            );
+async function checkToken(req, res, next) {
+    
+    const auth = req.headers.authorization;
+    if (!auth) {
+        return res.status(401).json({
+            "status": "Bad request",
+            "message": "Missing Token",
+            "statusCode": 401
+        })
     }
-    //Decoding the token
-    const decodedToken =
-        jwt.verify(token, "secretkeyappearshere");
-        req['verifiedUser'] = {
-            userId: decodedToken.userId,
-            email: decodedToken.email
+    
+    if (!auth.startsWith('Bearer ')) {
+        return res.status(401).json({
+            "status": "Bad request",
+            "message": "Invalid Token",
+            "statusCode": 401
+        })
+    }
+    
+    const token = auth.split(' ')[1]
+    if (!token) {
+        return res.status(401).json({
+            "status": "Bad request",
+            "message": "Invalid Token",
+            "statusCode": 401
+        })
+    }
+
+    try {
+        const decodedToken = jwt.verify(token, process.env.JWT_SECRET);
+
+        const user = await prisma.user.findUnique({ where: { email: decodedToken.email } })
+        if (!user) {
+            return res.status(404).json({
+                "status": "Bad request",
+                "message": "User record not found!",
+                "statusCode": 404
+            })
         }
-    next()
+        req['verifiedUser'] = { ...decodedToken, token }
+        next()
+    } catch {
+        return res.status(401).json({
+            "status": "Bad request",
+            "message": "Invalid or expired Token",
+            "statusCode": 401
+        })
+    }
 }
 
 module.exports = checkToken

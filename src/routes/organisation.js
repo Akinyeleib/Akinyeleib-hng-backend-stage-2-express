@@ -1,115 +1,167 @@
 const { Router } = require('express')
-const { v4: uuidv4 } = require('uuid');
-const jwt = require("jsonwebtoken");
 require('dotenv').config()
 const router = Router()
 
+const { PrismaClient } = require('@prisma/client');
+const checkToken = require('../utils/utils');
+const prisma = new PrismaClient()
 
-router.post('/register', (req, res) => {
-    const body = req.body
-    const { firstName, lastName, email, phone, password } = body
-    const errors = []
+router.get('/', checkToken,async (req, res) => {
+    const { userId } = req.verifiedUser
 
-    if (!firstName) { 
-        addErrorToList(errors, "firstName", "firstName can not be blank")
-    }
-    if (!lastName) { 
-        addErrorToList(errors, "lastName", "lastName can not be blank")
-    }
-    if (!email) { 
-        addErrorToList(errors, "email", "email can not be blank")
-    }
-    if (!password) { 
-        addErrorToList(errors, "password", "password can not be blank")
-    }
-    if (errors.length > 0) {
-        return res.status(422).json({
-            "errors": errors
-        })
-    }
+    const organisations = await prisma.organisation.findMany({
+        where:{
+            users: 
+            { some: {userId} }
+        }
+    })
 
-    const userId = "id"
-    let token = generateToken({ userId, email }, res)
-
-    return res.status(201).json({
+    return res.status(200).json({
         "status": "success",
-        "message": "Registration successful",
+        "message": "organisations retrieval successful",
         "data": {
-            "accessToken": token,
-            "userId": generateUUID(),
-            "firstName": firstName,
-            "lastName": lastName,
-            "email": email,
-            "phone": phone
+            "organisations": organisations
         }
     })
 
 })
 
-router.post('/login', (req, res) => {
-    const body = req.body
-    const { email, password } = body
-    const errors = []
+router.get('/:orgId', checkToken,async (req, res) => {
+    const { orgId } = req.params
+    const { userId } = req.verifiedUser
+    
+    const organisation = await prisma.organisation.findUnique({
+        where:{
+            orgId,
+            users: { some: {userId} }
+        },
+        
+    })
 
-    if (!email) { 
-        addErrorToList(errors, "email", "email can not be blank")
+    if (!organisation) {
+        return res.status(404).json({
+            "status": "Failed",
+            "message": "User doesn't belong to any organisation with the specified id",
+            "statusCode": 404
+        })
     }
-    if (!password) { 
-        addErrorToList(errors, "password", "password can not be blank")
+
+    const data = { ...organisation }
+
+    return res.status(200).json({
+        "status": "success",
+        "message": "successful",
+        data
+    })
+
+})
+
+router.post('/', checkToken, async (req, res) => {
+    const { name, description } = req.body
+    const errors = []
+    
+    if (!name) { 
+        addErrorToList(errors, "name", "name is a required field")
+    } else if (typeof name !== "string") {
+        addErrorToList(errors, "name", "name must be string")
     }
+
+    if (description && typeof description !== "string") {
+        addErrorToList(errors, "description", "description must be string")
+    }
+    
     if (errors.length > 0) {
         return res.status(422).json({
             "errors": errors
         })
     }
 
-    const userId = "id"
-    
-    let token = generateToken({ userId, email }, res)
+    const organisation = await prisma.organisation.create({
+        data: {
+            name,
+            description
+        }  
+    })
 
-    return res
-        .status(200)
-        .json({
-            "status": "success",
-            "message": "Login successful",
-            data: {
-                accessToken: token,
-                user: userId,
-                orgs: email,
-            },
-        });
+    const data = { ...organisation }
+
+    return res.status(200).json({
+        "status": "success",
+        "message": "Organisation created successfully",
+        data
+    })
 
 })
 
-function generateUUID() { return uuidv4() }
+router.post('/:orgId/users', async (req, res) => {
+    const { orgId } = req.params
+    const { userId } = req.body
+    
+    const errors = []
+    
+    if (!userId) { 
+        addErrorToList(errors, "userId", "userId is a required field")
+    } else if (typeof userId !== "string") {
+        addErrorToList(errors, "userId", "userId must be string")
+    }
+    
+    if (errors.length > 0) {
+        return res.status(422).json({
+            "errors": errors
+        })
+    }
+
+    let organisation = await prisma.organisation.findUnique({ where:{ orgId } })
+
+    if (!organisation) {
+        return res.status(404).json({
+            "status": "Failed",
+            "message": "Organisation with the specified id doesn't exist",
+            "statusCode": 404
+        })
+    }
+    
+    const user = await prisma.user.findUnique({where:{userId}})
+    if (!user) {
+        return res.status(404).json({
+            "status": "Failed",
+            "message": "User with the specified id doesn't exist",
+            "statusCode": 404
+        })
+    }
+
+    organisation = await prisma.organisation.findUnique({
+        where:{
+            orgId,
+            users: { some: {userId} }
+        }
+    })
+
+    if (organisation) {
+        return res.status(409).json({
+            "status": "failed",
+            "message": "User already added to organisation"
+        })
+    }
+
+    await prisma.organisation.update({
+        where: { orgId },
+        data: {
+            users: {
+                connect: { userId }
+            }
+        }
+    })
+
+    return res.status(200).json({
+        "status": "success",
+        "message": "User added to organisation successfully"
+    })
+
+})
 
 function addErrorToList(list, field, message) {
     list.push({ "field": field, "message": message })
 } 
-
-function generateToken(user, res) {
-    const { userId, email } = user
-    let token;
-    try {
-        token = jwt.sign(
-            {
-                userId,
-                email
-            },
-            process.env.JWT_SECRET,
-            { expiresIn: "1h" }
-        );
-        return token
-    } catch (err) {
-        console.log(err);
-        return res
-        .status(500)
-        .json({
-            "status": "failed",
-            "message": "Unable to generate token"
-        })
-    }
-}
-
 
 module.exports = router
