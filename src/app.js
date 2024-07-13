@@ -2,11 +2,8 @@ const express = require('express')
 const authRouter = require('./routes/auth')
 const userRouter = require('./routes/user')
 const organisationRouter = require('./routes/organisation')
-require('dotenv').config()
 
 const app = express()
-
-const PORT = process.env.PORT || 81
 
 app.use(express.json())
 
