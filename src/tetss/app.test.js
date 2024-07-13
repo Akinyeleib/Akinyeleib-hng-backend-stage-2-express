@@ -1,8 +1,10 @@
-const app = require('./app')
-const request = requi../appupertest')
+const app = require('../app')
+const request = require('supertest')
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const { describe, expect, test } = require('@jest/globals')
+
+const email = "hng-intern@gmail.com"
 
 describe('Auth Endpoints', () => {
     afterAll(async () => {
@@ -15,36 +17,36 @@ describe('Auth Endpoints', () => {
         const response = await request(app)
             .post('/auth/register')
             .send({
-                firstName: 'John',
-                lastName: 'Doe',
-                email: 'johnnys.doe@example.com',
-                phone: '1234567890',
-                password: 'password123'
+                "firstName": "hng",
+                "lastName": "intern",
+                email,
+                "password": "password123",
+                "phone":"08134312272"
             });
 
         expect(response.status).toBe(201);
         expect(response.body.data.userId).toBeDefined();
         expect(response.body.data.accessToken).toBeDefined();
 
-        const user = await prisma.user.findUnique({ where: { email: 'johnnys.doe@example.com' } });
+        const user = await prisma.user.findUnique({ where: { userId: response.body.data.userId } });
         expect(user).not.toBeNull();
 
         const organisation = await prisma.organisation.findFirst({ where: { users: { some: { userId: user.userId } } } });
         expect(organisation).not.toBeNull();
-        expect(organisation.name).toBe("John's Organisation");
+        expect(organisation.name).toBe(`${response.body.data.firstName}'s Organisation`);
     });
 
     test('should log the user in successfully', async () => {
         const response = await request(app)
             .post('/auth/login')
             .send({
-                email: 'johnnys.doe@example.com',
+                email,
                 password: 'password123'
             });
 
         expect(response.status).toBe(200);
         expect(response.body.data.accessToken).toBeDefined();
-        expect(response.body.data.user.email).toBe('johnnys.doe@example.com');
+        expect(response.body.data.user.email).toBe(email);
     });
 
     test('should fail if required fields are missing', async () => {
@@ -52,7 +54,7 @@ describe('Auth Endpoints', () => {
             .post('/auth/register')
             .send({
                 lastName: 'Doe',
-                email: 'missing.fields@example.com',
+                email: 'missing-fields@hng.com',
                 phone: '1234567890',
                 password: 'password123'
             });
@@ -67,9 +69,9 @@ describe('Auth Endpoints', () => {
         const response = await request(app)
             .post('/auth/register')
             .send({
-                firstName: 'Jane',
-                lastName: 'Doe',
-                email: 'johnnys.doe@example.com',
+                firstName: 'Invalid',
+                lastName: 'User',
+                email,
                 phone: '1234567891',
                 password: 'password123'
             });
